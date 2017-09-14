@@ -3,6 +3,7 @@ import sys
 from random import*
 import select
 import pickle
+import time
 from packet import Packet
 
 
@@ -66,47 +67,73 @@ def main(argv):
     sender_message = False
 
     while not sender_message:
-        ready_to_read, _, _ = select.select([c_sender_in_connection, c_receiver_in_connection], [], [])
+        ready_to_read, _, _ = select.select([c_sender_in_connection, c_receiver_in_connection], [], [], 1)
         for sock in ready_to_read:
             if sock == c_sender_in_connection:
+                print("start")
+                
                 data = c_sender_in_connection.recv(1024)
                 data_unpacked = pickle.loads(data) #causes error, runs out of data, EOFError 
                 return_no = data_unpacked.get_packet_sequence_no()
-                u = uniform(0, 1)
-                if u < p_rate: #sender doesnt receive ack so retransmits
-                    print("Data packet dropped!")
-                else:
-                    v = uniform(0,1)
-                    if data_unpacked.get_magic_no() != 0x497E:
-                        print("No a valid packet!")
-                    elif data_unpacked.get_data_len() == 0:
-                        print("No data or empty packet received!")
-                        sender_message = True
-                    else:# Send acknowledgement packet, nothin
-                        if v < 0.1: #introduce bit errors
-                            data_unpacked.incrementDataLen(randint(0,10)) #increment the dataLen by randint 
-
-                        #send ack packet    
-                        print("Received; seqno:{}\n".format(data_unpacked.get_packet_sequence_no()))
-                        acknowledgement_packet = Packet(0x497E, 1, return_no, 0, None)
-                        bytestream_packet = pickle.dumps(acknowledgement_packet)
-                        c_sender_out.send(bytestream_packet)
-                        #ack packet sent, now must forward to the receiver
-                        ser_packet = pickle.dumps(data_unpacked)
-                        c_receiver_out.send(ser_packet)
-                        print("Sent packet to the receiver!")
+                
+                sent = False
+                while not sent:
+                    u = uniform(0, 1)
+                    if u < p_rate: #sender doesnt receive  so retransmits
+                        print("Data packet dropped!")
+                        continue
+                    else:
+                        v = uniform(0,1)
+                        if data_unpacked.get_magic_no() != 0x497E:
+                            print("No a valid packet!")
+                        elif data_unpacked.get_data_len() == 0:
+                            print("No data or empty packet received!")
+                            sender_message = True
+                            sent = True
+                        else:# Send acknowledgement packet, nothin
+                            if v < 0.1: #introduce bit errors
+                                data_unpacked.incrementDataLen(randint(0,10)) #increment the dataLen by randint 
+                                #forwrd to the receiver
+                            ser_packet = pickle.dumps(data_unpacked)
+                            c_receiver_out.send(ser_packet)
+                            print("Sent data packet to the receiver!")
+                            sent = True
                         
             elif sock == c_receiver_in_connection:
-                 print("Packet received from receiver!")
+                
+                data_rec = c_receiver_in_connection.recv(1024)
+                data_unpacked_rec = pickle.loads(data_rec)
+                
+                sent2 = False
+                while not sent2:
+                    u_rec = uniform(0, 1)
+                    if u_rec < p_rate: #sender doesnt receive ack so retransmits
+                        print("Data packet dropped!")
+                    else:
+                        v_rec = uniform(0,1)
+                        if data_unpacked.get_magic_no() != 0x497E:
+                            print("No a valid packet!")
+                        elif data_unpacked.get_data_len() == 0:
+                            print("No data or empty packet received!")
+                            sender_message = True
+                            sent2 = True
+                        else:# Send acknowledgement packet, nothin
+                            if v_rec < 0.1: #introduce bit errors
+                                data_unpacked.incrementDataLen(randint(0,10)) #increment the dataLen by randint 
+                            #forwrd to the sender
+                            ser_packet = pickle.dumps(data_unpacked_rec)
+                            c_sender_out.send(ser_packet)
+                            print("Sent data packet to the sender!")
+                            sent2 = True
                  
 
             
                    
-
+    time.sleep(10)
     c_sender_in.close()
     c_sender_out.close()
     c_receiver_in.close()
     c_receiver_out.close()
         
 if __name__ == "__main__":
-    main([10000,10001,10002,10003,10004,10006,0.3])
+    main([10000,10001,10002,10003,10004,10058,0.1])

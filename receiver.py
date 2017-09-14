@@ -3,6 +3,7 @@ import sys
 import select
 import pickle
 from packet import Packet
+import time
 
 HOSTNAME = '127.0.0.1'
 
@@ -20,7 +21,7 @@ def main(argv):
     r_in, r_out, cr_in= map(check_port_number, argv[0:3])
     file_name = argv[3]
 
-    file_write = open(file_name, 'a')
+    file_write = open(file_name, 'a+b')
     
     #create and bind all of the reciever sockets
     r_in_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -46,35 +47,33 @@ def main(argv):
     while not received_message:
         ready,_,_ = select.select([r_in_sock_connection], [], [])
         if r_in_sock_connection in ready:
-            # Receives message from sender
             print("Packet received")
             data = r_in_sock_connection.recv(1024)
             try:
                 data = pickle.loads(data)
                 return_no = data.get_packet_sequence_no()
+                print(data)
                 if data.get_data_len() == 0:
                     print("No data or empty packet received!")
-                    received_message_c = True
+                    received_message = True
                 else:
-                    #print("Received; seqno:{}\n".format(data))
-                    # Send acknowledgement packet
-                    file_write.write(data.get_packet_payload().decode("utf-8") ) #write data to file
-                    
+                    file_write.write(data.get_packet_payload()) #write data to file 
                     acknowledgement_packet = Packet(0x497E, 1, return_no, 0, None)
                     bytestream_packet = pickle.dumps(acknowledgement_packet)
                     r_out_sock.send(bytestream_packet)
                     print("Sent ack to channel")
             except EOFError as e:
-                file_write.close()
-                print("Closed File", e)
+                    file_write.close()
+                    received_message = True
 
-
+    time.sleep(5)
     r_in_sock.close()
     r_out_sock.close()
+    file_write.close()
     
     
         
 
 
 if __name__ == "__main__":
-    main([10006, 10007, 10002, "test.txt"]);
+    main([10058, 10007, 10002, "test2.txt"]);
