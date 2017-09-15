@@ -1,6 +1,7 @@
 import socket
 import os
 import time
+import sys
 import pickle
 from packet import Packet
 import select
@@ -30,8 +31,11 @@ def main(argv):
 
 
     #sender to channel connection
-    sender_out.connect((HOSTNAME, c_s_in))
-    print("Sender connected to {}".format(c_s_in))
+    try:
+        sender_out.connect((HOSTNAME, c_s_in))
+        print("Sender connected to {}".format(c_s_in))
+    except socket.error:
+        sys.exit("Cannot connect! Exiting...")
 
     #listen for channel to sender connection
     sender_in.listen(5)
@@ -41,55 +45,64 @@ def main(argv):
     try:
         file_in = open(file_name, 'rb')
     except IOError:
-        exit()
+        sys.exit("File cannot be found. Exiting...")
 
     next_ = 0
     exit_flag = False
     text_position = 0
     packets_sent = 0
-    
     while not exit_flag:
         file_in.seek(text_position) #go to the position in the file
         data_to_be_sent = file_in.read(512) # read 512 bytes of data from the file
-
-        print(len(data_to_be_sent))
         if len(data_to_be_sent) == 0:
-            print("No more data to be sent")
-            packet_to_send = Packet(0x497E, 0, next_, 0, None) #create a new packet
-            exit_flag = True # terminate because no more data to be read 
+            print("No more data to be sent! Sending blank packet..")
+            packet_to_send = Packet(0x497E, 0, next_, 0, None)
+            exit_flag = True
         else:
             packet_to_send = Packet(0x497E, 0, next_, len(data_to_be_sent), data_to_be_sent) # create new packet
             text_position += 512 # adjust file position
 
         bytestream_packet = pickle.dumps(packet_to_send) #serialises packet as string object rather than writing to a file
         confirmation_received = False
-        
         while not confirmation_received: # waits for ack from the channel/rec before sending the next packet
             sender_out.send(bytestream_packet)
-            
+            print("Packet {} sent!".format(packets_sent))
+            packets_sent += 1
             ready,_,_ = select.select([sender_in_connection], [], [], 1)#wait for response
-            if sender_in_connection in ready: 
-                data_received = sender_in_connection.recv(1024)
+            if sender_in_connection in ready:
                 try:
+                    data_received = sender_in_connection.recv(1024)
                     data_received = pickle.loads(data_received)
-                    if  data_received.get_packet_type() != 1 or data_received.get_data_len() != 0 or data_received.get_magic_no() != 0x497E or data_received.get_packet_sequence_no() != next_:
-                        print("Packet mismatch, retransmitting...")
-                    else:
+                    if data_received.get_packet_sequence_no() == next_:
                         next_ += 1
-                        packets_sent += 1
-                        confirmation_received = True #terminate loop
-
-                except EOFError:
+                        confirmation_received = True
+                    else:
+                        print("Packet mismatch, retransmitting")
+                except EOFError: #read from empty file.
                     file_in.close()
+                    sender_in.close()
+                    sender_out.close()
                     print("Total number of packets sent: {}", packets_sent)
+                    sys.exit("Sockets closed!")
+                except ConnectionResetError:
+                    print("Connection interrupted! Closing..")
+                    file_in.close()
+                    sender_in.close()
+                    sender_out.close()
+                    sys.exit()
                     
-                  
-    sender_in.close()
-    sender_out.close()
+   
+    
+            
+         
+                    
+                    
+               
+    
     
             
 
 if __name__ == "__main__":
-    main([10004, 10005, 10000, "test1.pdf"]);
+    main([10004, 10005, 10000, "text.2.txt"]);
         
     

@@ -1,8 +1,6 @@
 class Packet():
     def __init__ (self, magicno, p_type, seqno, dataLen, data):
         self.magicno = magicno
-        data_packet = 0
-        acknowledgement_packet = 1
         self.p_type = p_type
         self.seqno = seqno
         self.dataLen = dataLen
@@ -14,6 +12,10 @@ class Packet():
 
     def get_magic_no(self):
         return self.magicno
+
+    def check_data_len(self):
+        if self.dataLen > 512:
+            return 0
 
     def incrementDataLen(self, x):
         self.dataLen += x
