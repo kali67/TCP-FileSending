@@ -90,15 +90,7 @@ def main(argv):
                     if data_unpacked.get_magic_no() != 0x497E:
                         print("No a valid packet!")
                         continue
-                    elif data_unpacked.get_data_len() == 0:
-                        print("No data or empty packet received!")
-                        sender_message = True
-                    else:# forward packet to receiver
-                        v = uniform(0,1)
-                        if v < 0.1: #introduce bit errors
-                            data_unpacked.incrementDataLen(randint(0,10)) #increment the dataLen by randint 
-                            #forwrd to the receiver
-                        ser_packet = pickle.dumps(data_unpacked)
+                    
                         print("Packet from sender: {}".format(data_unpacked.get_packet_sequence_no()))
                         c_receiver_out.send(ser_packet)
                         
@@ -115,13 +107,7 @@ def main(argv):
                     v_rec = uniform(0,1)
                     if data_unpacked_rec.get_magic_no() != 0x497E:
                         print("Not a valid packet!")
-                    else:# Send acknowledgement packet, nothin
-                        if v_rec < 0.1: #introduce bit errors
-                            data_unpacked_rec.incrementDataLen(randint(0,10)) #increment the dataLen by randint 
-                        #forwrd to the sender
-                        ser_packet = pickle.dumps(data_unpacked_rec)
-                        print("Packet from receiver: {}".format(data_unpacked_rec.get_packet_sequence_no()))
-                        c_sender_out.send(ser_packet)
+                    
                         
                      
                  
